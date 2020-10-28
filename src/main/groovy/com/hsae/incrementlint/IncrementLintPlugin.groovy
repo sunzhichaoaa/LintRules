@@ -11,7 +11,6 @@ import org.gradle.api.Project
 public class IncrementLintPlugin implements Plugin<Project> {
     @Override
     void apply(Project project) {
-        System.out.println("====== increment lint check start123 ======")
         project.task("lintCheck").doLast {
             println("=========== Lint check start ==============")
             List<String> commitList = getCommitChange(project)
@@ -23,6 +22,8 @@ public class IncrementLintPlugin implements Plugin<Project> {
                  file = new File(s)
                 files.add(file)
             }
+
+            IssueRegistry registry = new BuiltinIssueRegistry();
 
             def cl = new LintToolClient()
             def flag = cl.flags // LintCliFlags 用于设置Lint检查的一些标志
@@ -43,11 +44,36 @@ public class IncrementLintPlugin implements Plugin<Project> {
              * files->需要检查的文件文件
              * result 检查结果 设置flag.setExitCode = true时, 有错误的时候返回1 反之返回0
              */
-            println("------------ run start ------------")
             cl.run(new IssuesRegister(), files)
-            println("------------- run end --------------")
             println("============ Lint check end ===============")
         }
+
+        /*
+        * gradle task: 将git hooks 脚本复制到.git/hooks文件夹下
+        * 根据不同的系统类型复制不同的git hooks脚本(现支持Windows、Linux两种)
+        */
+        project.task("installGitHooks").doLast {
+            println("OS Type:" + System.getProperty("os.name"))
+            File postCommit
+            String OSType = System.getProperty("os.name")
+            System.out.println("windows:"+project.rootDir)
+            if (OSType.contains("Windows")) {
+                postCommit = new File(project.rootDir, "post-commit-windows")
+            } else {
+                postCommit = new File(project.rootDir, "post-commit")
+            }
+
+            project.copy {
+                from (postCommit) {
+                    rename {
+                        String filename ->
+                            "post-commit"
+                    }
+                }
+                into new File(project.rootDir, ".git/hooks/")
+            }
+        }
+
     }
 
     /**
@@ -70,7 +96,7 @@ public class IncrementLintPlugin implements Plugin<Project> {
             //String command = "git diff --name-only --diff-filter=ACMRTUXB"
             //String command = "git diff --name-only --diff-filter=ACMRTUXB  HEAD~1 HEAD~0 $projectDir"
             //System.out.println(command)
-           //String changeInfo = command.execute(null, project.getRootDir()).text.trim()
+            //String changeInfo = command.execute(null, project.getRootDir()).text.trim()
             //System.out.println("changeINfo:" + changeInfo)
             if (cmdStatusINfo == null || cmdStatusINfo.empty) {
                 return filterList
@@ -98,4 +124,35 @@ public class IncrementLintPlugin implements Plugin<Project> {
             return filterList
         }
     }
+
+//    /**
+//     * 通过Git命令获取需要检查的文件
+//     *
+//     * @param project gradle.Project
+//     * @return 文件名
+//     */
+//    static List<String> getCommitChange(Project project) {
+//        ArrayList<String> filterList = new ArrayList<>()
+//        try {
+//            //此命令获取本次提交的文件 在git commit之后执行
+//            String projectDir = project.getProjectDir()
+//            System.out.println("projectDir dir:"+project.getRootDir())
+//            String versionCmd = "git diff .";
+//            String versionInfo = versionCmd.execute(null, project.getRootDir()).text.trim()
+//            System.out.println("print version cmd:"+versionCmd)
+//            String command = "git diff --name-only --diff-filter=ACMRTUXB $projectDir"
+//            System.out.println("root dir:"+project.getRootDir())
+//            String changeInfo = command.execute(null, project.getRootDir()).text.trim()
+//            System.out.println("getCommitChange:" + changeInfo)
+//            if (changeInfo == null || changeInfo.empty) {
+//                return filterList
+//            }
+//            String[] lines = changeInfo.split("\\n")
+//            return lines.toList()
+//        } catch (Exception e) {
+//            e.printStackTrace()
+//            return filterList
+//        }
+//    }
+
 }
